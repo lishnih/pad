@@ -20,6 +20,7 @@ if sys.version_info >= (3,):
          asksaveasfilename)
     from tkinter.messagebox import (showinfo, showwarning, showerror,
          askquestion, askokcancel, askyesno, askretrycancel)
+    from tkinter.simpledialog import askstring
 else:
     import Tkinter as tk
     import ttk
@@ -27,6 +28,7 @@ else:
          asksaveasfilename)
     from tkMessageBox import (showinfo, showwarning, showerror,
          askquestion, askokcancel, askyesno, askretrycancel)
+    from tkSimpleDialog import askstring
 
 
 class ScrolledText(tk.Frame):
@@ -45,7 +47,7 @@ class ScrolledText(tk.Frame):
 
     def appendText(self, text=""):
         self.text.insert(tk.INSERT, text)
-        self.text.mark_set(tk.INSERT, '1.0')
+        self.text.mark_set(tk.INSERT, "1.0")
         self.text.focus()
 
     def setText(self, text=""):
@@ -53,27 +55,41 @@ class ScrolledText(tk.Frame):
         self.appendText(text)
 
     def getText(self):
-        return self.text.get('1.0', tk.END+'-1c')
+        return self.text.get("1.0", tk.END+'-1c')
 
     def bind(self, event, handler, add=None):
         self.text.bind(event, handler, add)
 
 
-class Statusbar(tk.Frame):
+class StatusBar(tk.Frame):
     def __init__(self, parent=None):
         tk.Frame.__init__(self, parent)
 
-        self.status = tk.StringVar()
-        self.label = tk.Label(self, textvariable=self.status, anchor=tk.W)
-        self.label.pack(fill=tk.X)
+        self.labels = {}
 
-    def setText(self, text=""):
-        self.status.set(text)
+    def setLabel(self, name=0, side=tk.LEFT, **kargs):
+        label = tk.Label(self, bd=1, relief=tk.SUNKEN, anchor=tk.W, **kargs)
+        label.pack(side=side)
+        self.labels[name] = label
+
+        return label
+
+    def setText(self, text="", name=0):
+        if name in self.labels:
+            label = self.labels[name]
+        else:
+            label = self.setLabel(name)
+            self.labels[name] = label
+
+        label.config(text=text)
 
 
 class Menu(tk.Menu):
-    def __init__(self, master=None, **options):
-        tk.Menu.__init__(self, master, **options)
+#   def __init__(self, master=None, **options):
+#       tk.Menu.__init__(self, master, **options)
+
+    def add_command2(self, **options):
+        tk.Menu.add_command(self, **options)
 
     def add_command(self, **options):
         tk.Menu.add_command(self, **options)
@@ -131,12 +147,19 @@ class AppUI(tk.Tk):
         menu.add_command(command=self.onEditUndo, label="Undo", accelerator="Ctrl+Z", underline=0)
         menu.add_command(command=self.onEditRedo, label="Redo", accelerator="Ctrl+Shift-Z", underline=0)
         menu.add_separator()
-        menu.add_command(command=self.onEditCut, label="Cut", accelerator="Ctrl+X", underline=1)
-        menu.add_command(command=self.onEditCopy, label="Copy", accelerator="Ctrl+C", underline=0)
-        menu.add_command(command=self.onEditPaste, label="Paste", accelerator="Ctrl+V", underline=0)
+        menu.add_command2(command=self.onEditCut, label="Cut", accelerator="Ctrl+X", underline=1)
+        menu.add_command2(command=self.onEditCopy, label="Copy", accelerator="Ctrl+C", underline=0)
+        menu.add_command2(command=self.onEditPaste, label="Paste", accelerator="Ctrl+V", underline=0)
         menu.add_command(command=self.onEditDelete, label="Delete", underline=0)
         menu.add_separator()
         menu.add_command(command=self.onEditSelectAll, label="Select all", accelerator="Ctrl+A", underline=7)
+
+        menu = Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Search", menu=menu, underline=0)
+        menu.add_command(command=self.onSearchFind, label="Find", accelerator="Ctrl+F", underline=0)
+        menu.add_command(command=self.onSearchFind, label="Replace", accelerator="Ctrl+H", underline=0)
+        menu.add_command2(command=self.onSearchFind, label="Find next", accelerator="F3", underline=0)
+        menu.add_command(command=self.onSearchFind, label="Find previous", accelerator="Shift-F3", underline=0)
 
         menu = Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Help", menu=menu, underline=0)
@@ -151,15 +174,27 @@ class AppUI(tk.Tk):
         self.text.pack(fill=tk.BOTH, expand=tk.YES)
 
         # Status Widget
-        self.status = Statusbar(self)
+        self.status = StatusBar(self)
         self.status.pack(fill=tk.X)
+
+        self.status.setLabel("position", width=20)
+        self.status.setLabel("symbol", width=10)
+#       self.status.setLabel("highlight", width=10)
+#       self.status.setLabel("eol", width=10)
+#       self.status.setLabel("codepage", width=20)
 
         ### Bind ###
 
         self.protocol('WM_DELETE_WINDOW', self.onFileExit)
-        self.text.bind("<Button-3>", self.onRButton)
+        self.text.bind('<Key>', self.onSelection)
+        self.text.bind('<Button-1>', self.onSelection)
+        self.text.bind('<Button-3>', self.onRButton)
+        self.bind('<<Selection>>', self.onSelection)
+        self.text.bind('<<Modified>>', self.onSelection)
 
         ### Initial ###
+
+        self.cursorinfo()
 
         self.update_idletasks()
         self.minsize(self.winfo_reqwidth(), self.winfo_reqheight())
@@ -176,28 +211,28 @@ class AppUI(tk.Tk):
         self.loadfileDialog()
 
     def onFileClose(self, event=None):
-        self.filename = None
+        self.filename = ""
         self.filetype = None
         self.text.setText()
         self.status.setText(self.filename)
 
     def onFileSave(self, event=None):
-        pass
+        print('dummy')
 
     def onFileSaveAs(self, event=None):
-        pass
+        print('dummy')
 
     def onFileInfo(self, event=None):
-        pass
+        print('dummy')
 
     def onFilePrint(self, event=None):
-        pass
+        print('dummy')
 
     def onFilePrintSettings(self, event=None):
-        pass
+        print('dummy')
 
     def onFilePreview(self, event=None):
-        pass
+        print('dummy')
 
     def onFileExit(self, event=None):
         res = askokcancel("Exit", "Really quit?")
@@ -205,28 +240,50 @@ class AppUI(tk.Tk):
             self.destroy()
 
     def onEditUndo(self, event=None):
-        pass
+        print('dummy')
 
     def onEditRedo(self, event=None):
-        pass
+        print('dummy')
 
     def onEditCut(self, event=None):
-        pass
+        if self.text.text.tag_ranges(tk.SEL):
+            text = self.text.text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.text.text.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            self.clipboard_clear()
+            self.clipboard_append(text)
 
     def onEditCopy(self, event=None):
-        pass
+        if self.text.text.tag_ranges(tk.SEL):
+            text = self.text.text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.clipboard_clear()
+            self.clipboard_append(text)
 
     def onEditPaste(self, event=None):
-        pass
+        text = self.selection_get(selection='CLIPBOARD')
+        self.text.text.insert(tk.INSERT, text)
 
     def onEditDelete(self, event=None):
-        pass
+        if self.text.text.tag_ranges(tk.SEL):
+            text = self.text.text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.text.text.delete(tk.SEL_FIRST, tk.SEL_LAST)
 
     def onEditSelectAll(self, event=None):
-        pass
+#       self.text.text.tag_remove(tk.SEL, "1.0", tk.END)
+        self.text.text.tag_add(tk.SEL, "1.0", tk.END)
+        self.text.text.mark_set(tk.INSERT, "1.0")
+        self.text.text.see(tk.INSERT)
 
-    def onRButton(self, event=None):
-        print("Right")
+    def onSearchFind(self, event=None):
+        target = askstring("Find", "Enter string for searching")
+        if target:
+            start = self.text.text.search(target, tk.INSERT, tk.END)
+            if start:
+#               self.text.text.tag_remove(tk.SEL, "1.0", tk.END)
+                stop = start + '+{0}c'.format(len(target))
+                self.text.text.tag_add(tk.SEL, start, stop)
+                self.text.text.mark_set(tk.INSERT, start)
+                self.text.text.see(tk.INSERT)
+                self.text.text.focus()
 
     def onHelpAbout(self, event=None):
         text = """{0}\n{1}\nVersion {2}\n
@@ -235,6 +292,12 @@ Package: {4}
 """.format(__pkgname__, __description__, __version__,
            sys.version, __package__)
         showinfo("About", text)
+
+    def onRButton(self, event=None):
+        print("Right")
+
+    def onSelection(self, event=None):
+        self.cursorinfo()
 
     ### Dialogs ###
 
@@ -255,7 +318,20 @@ Package: {4}
 
         self.filename = filename
         self.filetype = None
-        self.status.setText(self.filename)
+        self.cursorinfo()
+        self.status.setText(filename)
+
+    def cursorinfo(self):
+        position = self.text.text.index(tk.CURRENT)
+
+        symbol = self.text.text.get(position)
+        self.status.setText(repr(symbol), "symbol")
+
+        if self.text.text.tag_ranges(tk.SEL):
+            start, stop = self.text.text.tag_ranges(tk.SEL)
+            position += " [{0}:{1}]".format(start.string, stop.string)
+
+        self.status.setText(position, "position")
 
 
 
