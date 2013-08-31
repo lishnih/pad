@@ -46,8 +46,8 @@ class ScrolledText(tk.Frame):
         self.text.config(font=('Courier', 9, 'normal'))
 
     def appendText(self, text=""):
-        self.text.insert(tk.INSERT, text)
-        self.text.mark_set(tk.INSERT, "1.0")
+        self.text.insert(tk.END, text)
+#       self.text.mark_set(tk.INSERT, "1.0")
         self.text.focus()
 
     def setText(self, text=""):
